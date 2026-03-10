@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Real-Time Chat</title>
+    <style>
+        /* Base styles & Background Gradient */
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { 
+            background: linear-gradient(135deg, #e5ddd5 0%, #c1cece 100%); 
+            display: flex; justify-content: center; align-items: center; height: 100vh; color: #333; 
+        }
+        
+        /* The White Auth Card */
+        .auth-card { 
+            background: #ffffff; width: 100%; max-width: 420px; padding: 45px 35px; 
+            border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; 
+        }
+        .auth-card h2 { margin-bottom: 8px; font-size: 2rem; color: #075e54; font-weight: 700; }
+        .auth-card p.subtitle { color: #667781; margin-bottom: 30px; font-size: 0.95rem; }
+
+        /* Styling Django's Auto-Generated Form Elements */
+        form { text-align: left; }
+        form p { margin-bottom: 20px; } /* Django wraps inputs in <p> tags */
+        form label { display: block; margin-bottom: 8px; font-weight: 600; color: #444; font-size: 0.9rem; }
+        
+        /* Smooth, modern input fields */
+        form input[type="text"], form input[type="password"] {
+            width: 100%; padding: 14px 16px; border: 1.5px solid #e0e0e0; 
+            border-radius: 8px; font-size: 1rem; transition: all 0.2s ease; background: #fafafa;
+        }
+        /* The glow effect when you click an input */
+        form input[type="text"]:focus, form input[type="password"]:focus {
+            border-color: #075e54; background: #fff; outline: none; 
+            box-shadow: 0 0 0 4px rgba(7, 94, 84, 0.1);
+        }
+        
+        /* Styling Django's Error Messages (e.g., "Wrong password") */
+        .errorlist { color: #d32f2f; font-size: 0.85rem; list-style-type: none; margin-top: 5px; padding: 0; }
+        
+        /* The Submit Button */
+        .btn { 
+            width: 100%; background: #075e54; color: white; padding: 15px; border: none; 
+            border-radius: 8px; font-size: 1.05rem; font-weight: bold; cursor: pointer; 
+            transition: background 0.2s, transform 0.1s; margin-top: 10px; 
+        }
+        .btn:hover { background: #128c7e; }
+        .btn:active { transform: scale(0.98); } /* Tiny click animation */
+
+        /* Bottom Link */
+        .auth-footer { margin-top: 25px; font-size: 0.95rem; color: #666; }
+        .auth-footer a { color: #075e54; text-decoration: none; font-weight: 600; }
+        .auth-footer a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="auth-card">
+        <h2>Welcome Back</h2>
+        <p class="subtitle">Log in to continue your conversations</p>
+        
+        <form method="post">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit" class="btn">Login</button>
+        </form>
+        
+        <div class="auth-footer">
+            Don't have an account? <a href="{% url 'register' %}">Create one</a>
+        </div>
+    </div>
+</body>
+</html>

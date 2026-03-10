@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Real-Time Chat</title>
+    <style>
+        /* Base Reset & Background */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: #dadbd3; display: flex; justify-content: center; align-items: center; height: 100vh; }
+
+        .chat-container { width: 100%; max-width: 600px; height: 90vh; background: #ffffff; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); display: flex; flex-direction: column; overflow: hidden; }
+
+        .chat-header { background-color: #075e54; color: white; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; }
+        
+        #chat-box { flex: 1; padding: 20px; background-color: #e5ddd5; background-image: url("https://www.transparenttextures.com/patterns/cubes.png"); overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+
+        .message { max-width: 75%; padding: 10px 14px; border-radius: 8px; position: relative; font-size: 0.95rem; line-height: 1.4; box-shadow: 0 1px 2px rgba(0,0,0,0.1); animation: fadeIn 0.3s ease-in-out; }
+        .message.sent { align-self: flex-end; background-color: #dcf8c6; border-top-right-radius: 0; }
+        .message.received { align-self: flex-start; background-color: #ffffff; border-top-left-radius: 0; }
+        
+        .meta { font-size: 0.75rem; color: #667781; margin-bottom: 4px; font-weight: bold; display: flex; justify-content: space-between; gap: 10px; }
+        .sent .meta { color: #4b822b; }
+
+        .input-area { background-color: #f0f2f5; padding: 16px; display: flex; gap: 10px; }
+        input[type="text"] { padding: 12px 16px; border: 1px solid #ccc; border-radius: 24px; outline: none; font-size: 1rem; flex: 1; }
+        input[type="text"]:focus { border-color: #075e54; }
+        button { background-color: #075e54; color: white; border: none; border-radius: 24px; padding: 0 24px; font-size: 1rem; font-weight: bold; cursor: pointer; }
+        button:hover { background-color: #128c7e; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+    <div class="chat-container">
+        <div class="chat-header">
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <span style="font-weight: bold;">Room:</span>
+                <input id="room-name-input" type="text" value="global" style="padding: 4px 8px; border-radius: 4px; border: none; outline: none; color: black; font-weight: bold; width: 100px; font-size: 0.9rem;">
+                <button id="join-room-btn" style="padding: 4px 12px; font-size: 0.8rem; background: #128c7e;">Join</button>
+            </div>
+            
+            <div style="font-size: 0.85rem; display: flex; align-items: center; gap: 10px;">
+                <b>{{ username }}</b> | 
+                <form method="post" action="{% url 'logout' %}" style="margin: 0;">
+                    {% csrf_token %}
+                    <button type="submit" style="background: none; border: none; color: #ffcccc; text-decoration: underline; cursor: pointer; padding: 0; font-size: 0.85rem;">Logout</button>
+                </form>
+            </div>
+        </div>
+        
+        <div id="chat-box"></div>
+        <div id="typing-indicator" style="padding: 0 20px 5px; font-size: 0.85rem; color: #128c7e; font-style: italic; min-height: 25px; background: #f0f2f5;"></div>
+        
+       <div class="input-area">
+            <input type="file" id="image-input" accept="image/*" style="display: none;">
+            
+            <button id="attach-btn" style="background: #e5ddd5; color: #333; padding: 0 15px; border-radius: 24px; font-size: 1.2rem;">📎</button>
+            
+            <input id="chat-message-input" type="text" placeholder="Type a message...">
+            <button id="chat-message-submit">Send</button>
+        </div>
+    </div>
+
+<script>
+        const chatBox = document.getElementById('chat-box');
+        const typingIndicator = document.getElementById('typing-indicator');
+        const currentName = "{{ username }}"; 
+        let chatSocket = null; 
+        let selectedImageBase64 = null; 
+        let typingTimer;
+        const typingTimeout = 1500; 
+
+        function deleteMessage(msgId) {
+            if (confirm("Delete this message for everyone?")) {
+                chatSocket.send(JSON.stringify({
+                    'action': 'delete',
+                    'message_id': msgId
+                }));
+            }
+        }
+
+        function addMessage(msgId, msgUsername, messageText, timeStr, imageUrl = null) {
+            const messageElement = document.createElement('div');
+            messageElement.id = 'message-' + msgId; 
+            messageElement.className = (msgUsername === currentName) ? 'message sent' : 'message received';
+            
+            let imageHtml = '';
+            if (imageUrl) {
+                imageHtml = `<img src="${imageUrl}" style="max-width: 100%; border-radius: 8px; margin-bottom: 5px; max-height: 250px; object-fit: contain;">`;
+            }
+
+            let trashIcon = '';
+            if (msgUsername === currentName) {
+                trashIcon = `<span style="cursor: pointer; opacity: 0.6;" onclick="deleteMessage(${msgId})" title="Delete for everyone">🗑️</span>`;
+            }
+
+            messageElement.innerHTML = `
+                <div class="meta">
+                    <span>${msgUsername}</span>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <span style="font-weight: normal; font-size: 0.65rem;">${timeStr}</span>
+                        ${trashIcon}
+                    </div>
+                </div>
+                ${imageHtml}
+                <div>${messageText}</div>
+            `;
+            chatBox.appendChild(messageElement);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function connectToRoom(roomName) {
+            if (chatSocket) chatSocket.close();
+            chatBox.innerHTML = '';
+            typingIndicator.innerText = ''; 
+
+            fetch(`/api/messages/${roomName}/`)
+                .then(response => response.json())
+                .then(messages => {
+                    messages.forEach(msg => {
+                        const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        addMessage(msg.id, msg.username, msg.content, time, msg.image_url);
+                    });
+                });
+
+            // --- THE MOBILE FIX IS RIGHT HERE ---
+            // This automatically switches to a secure WSS connection if you are on a phone using HTTPS!
+            const wsScheme = window.location.protocol === "https:" ? "wss://" : "ws://";
+            chatSocket = new WebSocket(wsScheme + window.location.host + '/ws/chat/' + roomName + '/');
+
+            chatSocket.onmessage = function(e) {
+                const data = JSON.parse(e.data);
+                
+                if (data.action === 'delete') {
+                    const msgDiv = document.getElementById('message-' + data.message_id);
+                    if (msgDiv) {
+                        msgDiv.innerHTML = `<div style="color: #888; font-style: italic; font-size: 0.85rem; padding: 4px;">🚫 This message was deleted</div>`;
+                    }
+                    return; 
+                }
+
+                if (data.typing !== undefined) {
+                    if (data.username !== currentName) {
+                        typingIndicator.innerText = data.typing ? `${data.username} is typing...` : '';
+                    }
+                    return; 
+                }
+
+                const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                addMessage(data.message_id, data.username, data.message, time, data.image_url);
+                
+                if (data.username !== currentName) typingIndicator.innerText = '';
+            };
+        }
+
+        connectToRoom('global');
+
+        document.getElementById('join-room-btn').onclick = function(e) {
+            const roomName = document.getElementById('room-name-input').value.trim();
+            if (roomName) connectToRoom(roomName);
+        };
+
+        document.getElementById('chat-message-input').addEventListener('input', function() {
+            if (chatSocket.readyState === WebSocket.OPEN) {
+                chatSocket.send(JSON.stringify({ 'typing': true }));
+                clearTimeout(typingTimer);
+                typingTimer = setTimeout(() => { chatSocket.send(JSON.stringify({ 'typing': false })); }, typingTimeout);
+            }
+        });
+
+        document.getElementById('attach-btn').onclick = function() { document.getElementById('image-input').click(); };
+        document.getElementById('image-input').onchange = function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    selectedImageBase64 = event.target.result;
+                    document.getElementById('chat-message-input').placeholder = "📸 Image attached! Type a caption...";
+                };
+                reader.readAsDataURL(file);
+            }
+        };
+
+        document.getElementById('chat-message-submit').onclick = function(e) {
+            const messageInputDom = document.getElementById('chat-message-input');
+            const message = messageInputDom.value.trim();
+
+            if ((message !== "" || selectedImageBase64) && chatSocket.readyState === WebSocket.OPEN) {
+                chatSocket.send(JSON.stringify({ 
+                    'message': message,
+                    'image': selectedImageBase64
+                }));
+                
+                chatSocket.send(JSON.stringify({ 'typing': false }));
+                clearTimeout(typingTimer);
+
+                messageInputDom.value = ''; 
+                messageInputDom.placeholder = "Type a message...";
+                selectedImageBase64 = null;
+                document.getElementById('image-input').value = '';
+            }
+        };
+
+        document.getElementById('chat-message-input').onkeyup = function(e) {
+            if (e.key === 'Enter') document.getElementById('chat-message-submit').click();
+        };
+    </script>
+</body>
+</html>
